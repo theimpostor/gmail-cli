@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/mail"
 	"os"
 	"path"
 
@@ -80,7 +82,7 @@ func main() {
 	}
 
 	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, gmail.GmailReadonlyScope)
+	config, err := google.ConfigFromJSON(b, gmail.GmailSendScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
@@ -92,16 +94,32 @@ func main() {
 	}
 
 	user := "me"
-	r, err := srv.Users.Labels.List(user).Do()
+
+	// https://stackoverflow.com/a/57236908
+	from := mail.Address{Name: "Barry Gibbs", Address: "bg@example.com"}
+	to := mail.Address{Name: "Barry Gibbs", Address: "bg@example.com"}
+
+	header := make(map[string]string)
+	header["From"] = from.String()
+	header["To"] = to.String()
+	header["MIME-Version"] = "1.0"
+	header["Content-Type"] = "text/plain; charset=\"utf-8\""
+	header["Content-Transfer-Encoding"] = "base64"
+	header["Subject"] = "test subject"
+
+	var msg string
+	for k, v := range header {
+		msg += fmt.Sprintf("%s: %s\r\n", k, v)
+	}
+	msg += "\r\n" + "test body"
+
+	gmsg := gmail.Message{
+		Raw: base64.RawURLEncoding.EncodeToString([]byte(msg)),
+	}
+
+	_, err = srv.Users.Messages.Send(user, &gmsg).Do()
 	if err != nil {
-		log.Fatalf("Unable to retrieve labels: %v", err)
+		log.Fatalf("Unable to send msg %v, err %v", gmsg, err)
 	}
-	if len(r.Labels) == 0 {
-		fmt.Println("No labels found.")
-		return
-	}
-	fmt.Println("Labels:")
-	for _, l := range r.Labels {
-		fmt.Printf("- %s\n", l.Name)
-	}
+
 }
