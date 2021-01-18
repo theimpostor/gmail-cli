@@ -7,21 +7,21 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/gmail/v1"
-
-	"github.com/BurntSushi/xdg"
 )
 
 // Retrieve a token, saves the token, then returns the generated client.
 func getClient(config *oauth2.Config) *http.Client {
+	tokFile := path.Join(os.Getenv("HOME"), ".gmail-cli-token.json")
+
 	// The file token.json stores the user's access and refresh tokens, and is
 	// created automatically when the authorization flow completes for the first
 	// time.
-	tokFile := "token.json"
 	tok, err := tokenFromFile(tokFile)
 	if err != nil {
 		tok = getTokenFromWeb(config)
@@ -72,11 +72,7 @@ func saveToken(path string, token *oauth2.Token) {
 }
 
 func main() {
-	configPath := xdg.Paths{XDGSuffix: "gmail-cli"}
-	credentials, err := configPath.ConfigFile("credentials.json")
-	if err != nil {
-		log.Fatalf("Unable to find credentials file: %v", err)
-	}
+	credentials := path.Join(os.Getenv("HOME"), ".gmail-cli-credentials.json")
 
 	b, err := ioutil.ReadFile(credentials)
 	if err != nil {
