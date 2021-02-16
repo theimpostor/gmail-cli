@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -74,8 +77,29 @@ func saveToken(path string, token *oauth2.Token) {
 }
 
 func main() {
-	credentials := path.Join(os.Getenv("HOME"), ".gmail-cli-credentials.json")
 
+	fromName := flag.String("from-name", "", "From name")
+	fromEmail := flag.String("from-email", "", "From email address")
+	toName := flag.String("to-name", "", "To name")
+	toEmail := flag.String("to-email", "", "To email address")
+	subject := flag.String("subject", "", "Subject")
+
+	flag.Parse()
+
+	if *fromEmail == "" {
+		log.Fatalf("fromEmail is empty")
+	}
+	if *toEmail == "" {
+		log.Fatalf("toEmail is empty")
+	}
+	if *fromName == "" {
+		fromName = fromEmail
+	}
+	if *toName == "" {
+		toName = toEmail
+	}
+
+	credentials := path.Join(os.Getenv("HOME"), ".gmail-cli-credentials.json")
 	b, err := ioutil.ReadFile(credentials)
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -95,9 +119,8 @@ func main() {
 
 	user := "me"
 
-	// https://stackoverflow.com/a/57236908
-	from := mail.Address{Name: "Barry Gibbs", Address: "bg@example.com"}
-	to := mail.Address{Name: "Barry Gibbs", Address: "bg@example.com"}
+	from := mail.Address{Name: *fromName, Address: *fromEmail}
+	to := mail.Address{Name: *toName, Address: *toEmail}
 
 	header := make(map[string]string)
 	header["From"] = from.String()
@@ -105,21 +128,44 @@ func main() {
 	header["MIME-Version"] = "1.0"
 	header["Content-Type"] = "text/plain; charset=\"utf-8\""
 	header["Content-Transfer-Encoding"] = "base64"
-	header["Subject"] = "test subject"
+	header["Subject"] = *subject
 
-	var msg string
+	var base64encBuff bytes.Buffer
+	encoder := base64.NewEncoder(base64.RawURLEncoding, &base64encBuff)
 	for k, v := range header {
-		msg += fmt.Sprintf("%s: %s\r\n", k, v)
+		if _, err := fmt.Fprintf(encoder, "%s: %s\r\n", k, v); err != nil {
+			log.Fatalf("Failed writing headers, err %v", err)
+		}
 	}
-	msg += "\r\n" + "test body"
 
+	if _, err := fmt.Fprintf(encoder, "\r\n"); err != nil {
+		log.Fatalf("Failed writing header end, err %v", err)
+	}
+
+	var f *os.File
+	if len(flag.Args()) > 0 {
+		fname := flag.Args()[0]
+		if f, err := os.Open(fname); err != nil {
+			log.Fatalf("Failed to open file %v, err %v", fname, err)
+		} else {
+			defer f.Close()
+		}
+	} else {
+		f = os.Stdin
+	}
+
+	if _, err := io.Copy(encoder, f); err != nil {
+		log.Fatalf("Error reading body, err %v", err)
+	}
+
+	encoder.Close()
+
+	// TODO: figure out why short messages get corrupted
 	gmsg := gmail.Message{
-		Raw: base64.RawURLEncoding.EncodeToString([]byte(msg)),
+		Raw: base64encBuff.String(),
 	}
 
-	_, err = srv.Users.Messages.Send(user, &gmsg).Do()
-	if err != nil {
+	if _, err := srv.Users.Messages.Send(user, &gmsg).Do(); err != nil {
 		log.Fatalf("Unable to send msg %v, err %v", gmsg, err)
 	}
-
 }
