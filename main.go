@@ -145,7 +145,7 @@ func main() {
 	var f *os.File
 	if len(flag.Args()) > 0 {
 		fname := flag.Args()[0]
-		if f, err := os.Open(fname); err != nil {
+		if f, err = os.Open(fname); err != nil {
 			log.Fatalf("Failed to open file %v, err %v", fname, err)
 		} else {
 			defer f.Close()
@@ -160,7 +160,6 @@ func main() {
 
 	encoder.Close()
 
-	// TODO: figure out why short messages get corrupted
 	gmsg := gmail.Message{
 		Raw: base64encBuff.String(),
 	}
