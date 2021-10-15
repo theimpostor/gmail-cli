@@ -122,10 +122,6 @@ func main() {
 		toName = toEmail
 	}
 
-	srv := getGmail()
-
-	user := "me"
-
 	from := mail.Address{Name: *fromName, Address: *fromEmail}
 	to := mail.Address{Name: *toName, Address: *toEmail}
 
@@ -141,19 +137,20 @@ func main() {
 	encoder := base64.NewEncoder(base64.RawURLEncoding, &base64encBuff)
 	for k, v := range header {
 		if _, err := fmt.Fprintf(encoder, "%s: %s\r\n", k, v); err != nil {
-			log.Fatalf("Failed writing headers, err %v", err)
+			log.Fatalf("Failed writing headers: %v", err)
 		}
 	}
 
 	if _, err := fmt.Fprintf(encoder, "\r\n"); err != nil {
-		log.Fatalf("Failed writing header end, err %v", err)
+		log.Fatalf("Failed writing header end: %v", err)
 	}
 
 	var f *os.File
+	var err error
 	if len(flag.Args()) > 0 {
 		fname := flag.Args()[0]
-		if f, err := os.Open(fname); err != nil {
-			log.Fatalf("Failed to open file %v, err %v", fname, err)
+		if f, err = os.Open(fname); err != nil {
+			log.Fatalf("Failed to open file %v: %v", fname, err)
 		} else {
 			defer f.Close()
 		}
@@ -171,7 +168,11 @@ func main() {
 		Raw: base64encBuff.String(),
 	}
 
+	srv := getGmail()
+
+	user := "me"
+
 	if _, err := srv.Users.Messages.Send(user, &gmsg).Do(); err != nil {
-		log.Fatalf("Unable to send msg %v, err %v", gmsg, err)
+		log.Fatalf("Unable to send msg %v: %v", gmsg, err)
 	}
 }
