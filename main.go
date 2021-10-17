@@ -125,16 +125,15 @@ func main() {
 	from := mail.Address{Name: *fromName, Address: *fromEmail}
 	to := mail.Address{Name: *toName, Address: *toEmail}
 
+	// RFC 2822
 	header := make(map[string]string)
 	header["From"] = from.String()
 	header["To"] = to.String()
-	header["MIME-Version"] = "1.0"
-	header["Content-Type"] = "text/plain; charset=\"utf-8\""
-	header["Content-Transfer-Encoding"] = "base64"
+	// header["Content-Type"] = "text/plain; charset=utf-8"
 	header["Subject"] = *subject
 
 	var base64encBuff bytes.Buffer
-	encoder := base64.NewEncoder(base64.RawURLEncoding, &base64encBuff)
+	encoder := base64.NewEncoder(base64.URLEncoding, &base64encBuff)
 	for k, v := range header {
 		if _, err := fmt.Fprintf(encoder, "%s: %s\r\n", k, v); err != nil {
 			log.Fatalf("Failed writing headers: %v", err)
